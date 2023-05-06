@@ -72,7 +72,7 @@ func ScannerIsKeyword(v string) bool {
 
 func ScannerScanToken(s *Scanner) Token {
 	if ScannerIsAtEnd(s) {
-		return Token{"eof", "", (*s).line}
+		return Token{"EOF", "", (*s).line}
 	}
 	var string_1 string
 	var start int
@@ -81,73 +81,69 @@ func ScannerScanToken(s *Scanner) Token {
 
 	switch c {
 	case "(":
-		return Token{"left_paren", "(", (*s).line}
+		return Token{"LEFT_PAREN", "(", (*s).line}
 	case ")":
-		return Token{"right_paren", ")", (*s).line}
+		return Token{"RIGHT_PAREN", ")", (*s).line}
 	case "{":
-		return Token{"left_brace", "{", (*s).line}
+		return Token{"LEFT_BRACE", "{", (*s).line}
 	case "}":
-		return Token{"right_brace", "}", (*s).line}
+		return Token{"RIGHT_BRACE", "}", (*s).line}
 	case ",":
-		return Token{"comma", ",", (*s).line}
+		return Token{"COMMA", ",", (*s).line}
 	case ".":
-		return Token{"dot", ".", (*s).line}
+		return Token{"DOT", ".", (*s).line}
 	case "-":
-		return Token{"minus", "-", (*s).line}
+		return Token{"MINUS", "-", (*s).line}
 	case "+":
-		return Token{"plus", "+", (*s).line}
+		return Token{"PLUS", "+", (*s).line}
 	case ";":
-		return Token{"semicolon", ";", (*s).line}
+		return Token{"SEMICOLON", ";", (*s).line}
 	case "*":
-		return Token{"star", "*", (*s).line}
+		return Token{"STAR", "*", (*s).line}
 	case "!":
 		if ScannerMatch(s, "=") {
-			return Token{"bang_equal", "!=", (*s).line}
+			return Token{"BANG_EQUAL", "!=", (*s).line}
 		} else {
-			return Token{"bang", "!", (*s).line}
+			return Token{"BANG", "!", (*s).line}
 		}
 	case "=":
 		if ScannerMatch(s, "=") {
-			return Token{"equal_equal", "==", (*s).line}
+			return Token{"EQUAL_EQUAL", "==", (*s).line}
 		} else {
-			return Token{"equal", "=", (*s).line}
+			return Token{"EQUAL", "=", (*s).line}
 		}
 	case "<":
 		if ScannerMatch(s, "=") {
-			return Token{"less_equal", "<=", (*s).line}
+			return Token{"LESS_EQUAL", "<=", (*s).line}
 		} else {
-			return Token{"less", "<", (*s).line}
+			return Token{"LESS", "<", (*s).line}
 		}
 	case ">":
 		if ScannerMatch(s, "=") {
-			return Token{"greater_equal", ">=", (*s).line}
+			return Token{"GREATER_EQUAL", ">=", (*s).line}
 		} else {
-			return Token{"greater", ">", (*s).line}
+			return Token{"GREATER", ">", (*s).line}
 		}
 	case "\x22":
 		for (!ScannerIsAtEnd(s)) && (ScannerPeek(s) != "\x22") {
 			if ScannerIsPrintable(ScannerPeek(s)) {
 				ScannerAdvance(s)
 			} else {
-				log.Fatalln("Error while tokenization [ Line", (*s).line, "]", "- Unexpected character in string literal")
+				return Token{"ERROR", "Unexpected character in string literal", (*s).line}
 			}
 		}
 
 		if ScannerIsAtEnd(s) {
-			log.Fatalln("Error while tokenization [ Line", (*s).line, "]", "- Unterminated string")
+			return Token{"ERROR", "Unterminated string", (*s).line}
 		}
 
 		ScannerAdvance(s)
-		return Token{"string", string((*s).source[start+1 : (*s).current-1]), (*s).line}
+		return Token{"STRING", string((*s).source[start+1 : (*s).current-1]), (*s).line}
 	case "\x20":
-		return Token{"whitespace", "\x20", (*s).line}
-	case "\x0d":
-		return Token{"whitespace", "\x0d", (*s).line}
-	case "\x09":
-		return Token{"whitespace", "\x09", (*s).line}
+		return Token{"SPACE", "\x20", (*s).line}
 	case "\x0a":
 		(*s).line = (*s).line + 1
-		return Token{"new_line", "\x0a", (*s).line}
+		return Token{"NEW_LINE", "\x0a", (*s).line}
 	default:
 		if ScannerIsDigit(c) {
 			for ScannerIsDigit(ScannerPeek(s)) {
@@ -159,7 +155,7 @@ func ScannerScanToken(s *Scanner) Token {
 					ScannerAdvance(s)
 				}
 			}
-			return Token{"number", string((*s).source[start:(*s).current]), (*s).line}
+			return Token{"NUMBER", string((*s).source[start:(*s).current]), (*s).line}
 		} else if ScannerIsAlphabet(c) {
 			for (!ScannerIsAtEnd(s)) && (ScannerIsAlphabet(ScannerPeek(s)) || ScannerIsDigit(ScannerPeek(s))) {
 				ScannerAdvance(s)
@@ -168,14 +164,45 @@ func ScannerScanToken(s *Scanner) Token {
 			if ScannerIsKeyword(string_1) {
 				return Token{string_1, string_1, (*s).line}
 			} else {
-				return Token{"identifier", string_1, (*s).line}
+				return Token{"IDENTIFIER", string_1, (*s).line}
 			}
-		} else {
-			log.Fatalln("Error while tokenization [ Line", (*s).line, "]", "- Unexpected character", c)
 		}
 	}
 
-	return Token{"error", "", (*s).line}
+	return Token{"ERROR", "Internal error", (*s).line}
+}
+
+func ComplierIsValidSource(source []byte) bool {
+	for i := range source {
+		if !(source[i] == 0xa || ((source[i] >= 0x20) && (source[i] <= 0x7e))) {
+			return false
+		}
+	}
+	return true
+}
+
+func ComplierTokenize(source []byte) []Token {
+	var tokens []Token
+	var s = Scanner{source, 0, 1}
+	var t Token
+	for {
+		t = ScannerScanToken(&s)
+		tokens = append(tokens, t)
+		if t.t == "EOF" {
+			break
+		} else if t.t == "ERROR" {
+			log.Fatalln("Error while tokenization - Line", t.l, "-", t.s)
+		}
+	}
+	return tokens
+}
+
+func ComplierCompile(source []byte) {
+	if !ComplierIsValidSource(source) {
+		log.Fatalln("Error - Invalid source")
+	}
+	var tokens []Token = ComplierTokenize(source)
+	fmt.Println(tokens)
 }
 
 func main() {
@@ -184,12 +211,5 @@ func main() {
 		log.Fatal(e)
 	}
 
-	var s = Scanner{d, 0, 1}
-	for {
-		t := ScannerScanToken(&s)
-		fmt.Println(t)
-		if t.t == "eof" {
-			break
-		}
-	}
+	ComplierCompile(d)
 }
