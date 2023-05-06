@@ -12,7 +12,7 @@ type Token struct {
 	l int
 }
 type Scanner struct {
-	source  string
+	source  []byte
 	current int
 	line    int
 }
@@ -22,10 +22,7 @@ func ScannerIsAtEnd(s *Scanner) bool {
 }
 
 func ScannerMatch(s *Scanner, expected string) bool {
-	if ScannerIsAtEnd(s) {
-		return false
-	}
-	if string([]byte{(*s).source[(*s).current]}) != expected {
+	if ScannerIsAtEnd(s) || (string((*s).source[(*s).current:(*s).current+1]) != expected) {
 		return false
 	}
 	(*s).current = (*s).current + 1
@@ -33,93 +30,127 @@ func ScannerMatch(s *Scanner, expected string) bool {
 }
 
 func ScannerAdvance(s *Scanner) string {
-	var c string = string([]byte{(*s).source[(*s).current]})
+	var c string = string((*s).source[(*s).current : (*s).current+1])
 	(*s).current = (*s).current + 1
 	return c
 }
 
 func ScannerPeek(s *Scanner) string {
 	if ScannerIsAtEnd(s) {
-		return "\x00"
+		return ""
 	}
-	return string([]byte{(*s).source[(*s).current]})
+	return string((*s).source[(*s).current : (*s).current+1])
 }
 
 func ScannerPeekNext(s *Scanner) string {
 	if ((*s).current + 1) >= len((*s).source) {
-		return "\x00"
+		return ""
 	}
-	return string([]byte{(*s).source[(*s).current+1]})
+	return string((*s).source[(*s).current+1 : (*s).current+2])
 }
 
 func ScannerIsDigit(v string) bool {
 	return (len(v) == 1) && (v[0] >= 0x30) && (v[0] <= 0x39)
 }
-
-func ScannerMakeToken(s *Scanner, TokenT string, TokenS string) Token {
-	return Token{TokenT, TokenS, (*s).line}
+func ScannerIsPrintable(v string) bool {
+	return (len(v) == 1) && (v[0] >= 0x20) && (v[0] <= 0x7e)
 }
 
 func ScannerScanToken(s *Scanner) Token {
 	if ScannerIsAtEnd(s) {
-		return ScannerMakeToken(s, "eof", "")
+		return Token{"eof", "", (*s).line}
 	}
+	var start int
+	start = (*s).current
 	var c string = ScannerAdvance(s)
+
 	switch c {
 	case "(":
-		return ScannerMakeToken(s, "left_paren", "")
+		return Token{"left_paren", "(", (*s).line}
 	case ")":
-		return ScannerMakeToken(s, "right_paren", "")
+		return Token{"right_paren", ")", (*s).line}
 	case "{":
-		return ScannerMakeToken(s, "left_brace", "")
+		return Token{"left_brace", "{", (*s).line}
 	case "}":
-		return ScannerMakeToken(s, "right_brace", "")
+		return Token{"right_brace", "}", (*s).line}
 	case ",":
-		return ScannerMakeToken(s, "comma", "")
+		return Token{"comma", ",", (*s).line}
 	case ".":
-		return ScannerMakeToken(s, "dot", "")
+		return Token{"dot", ".", (*s).line}
 	case "-":
-		return ScannerMakeToken(s, "minus", "")
+		return Token{"minus", "-", (*s).line}
 	case "+":
-		return ScannerMakeToken(s, "plus", "")
+		return Token{"plus", "+", (*s).line}
 	case ";":
-		return ScannerMakeToken(s, "semicolon", "")
+		return Token{"semicolon", ";", (*s).line}
 	case "*":
-		return ScannerMakeToken(s, "star", "")
+		return Token{"star", "*", (*s).line}
 	case "!":
 		if ScannerMatch(s, "=") {
-			return ScannerMakeToken(s, "bang_equal", "")
+			return Token{"bang_equal", "!=", (*s).line}
 		} else {
-			return ScannerMakeToken(s, "bang", "")
+			return Token{"bang", "!", (*s).line}
 		}
 	case "=":
 		if ScannerMatch(s, "=") {
-			return ScannerMakeToken(s, "equal_equal", "")
+			return Token{"equal_equal", "==", (*s).line}
 		} else {
-			return ScannerMakeToken(s, "equal", "")
+			return Token{"equal", "=", (*s).line}
 		}
 	case "<":
 		if ScannerMatch(s, "=") {
-			return ScannerMakeToken(s, "less_equal", "")
+			return Token{"less_equal", "<=", (*s).line}
 		} else {
-			return ScannerMakeToken(s, "less", "")
+			return Token{"less", "<", (*s).line}
 		}
 	case ">":
 		if ScannerMatch(s, "=") {
-			return ScannerMakeToken(s, "greater_equal", "")
+			return Token{"greater_equal", ">=", (*s).line}
 		} else {
-			return ScannerMakeToken(s, "greater", "")
+			return Token{"greater", ">", (*s).line}
 		}
 	case "\x22":
+		for (!(ScannerIsAtEnd(s))) && (ScannerPeek(s) != "\x22") {
+			if ScannerIsPrintable(ScannerPeek(s)) {
+				ScannerAdvance(s)
+			} else {
+				log.Fatalln("Error while tokenization [ Line", (*s).line, "]", "- Unexpected character in string literal")
+			}
+		}
+
+		if ScannerIsAtEnd(s) {
+			log.Fatalln("Error while tokenization [ Line", (*s).line, "]", "- Unterminated string")
+		}
+
+		ScannerAdvance(s)
+		return Token{"string", string((*s).source[start+1 : (*s).current-1]), (*s).line}
 	case "\x20":
+		return Token{"whitespace", "\x20", (*s).line}
 	case "\x0d":
+		return Token{"whitespace", "\x0d", (*s).line}
 	case "\x09":
+		return Token{"whitespace", "\x09", (*s).line}
 	case "\x0a":
-		return ScannerMakeToken(s, "new_line", "")
+		(*s).line = (*s).line + 1
+		return Token{"new_line", "\x0a", (*s).line}
 	default:
-		log.Fatalln("Unexpected character", c, "at line", (*s).line)
+		if ScannerIsDigit(c) {
+			for ScannerIsDigit(ScannerPeek(s)) {
+				ScannerAdvance(s)
+			}
+			if (ScannerPeek(s) == ".") && ScannerIsDigit(ScannerPeekNext(s)) {
+				ScannerAdvance(s)
+				for ScannerIsDigit(ScannerPeek(s)) {
+					ScannerAdvance(s)
+				}
+			}
+			return Token{"number", string((*s).source[start:(*s).current]), (*s).line}
+		}
+
+		log.Fatalln("Error while tokenization [ Line", (*s).line, "]", "- Unexpected character", c)
 	}
-	return ScannerMakeToken(s, "", "")
+
+	return Token{"error", "", (*s).line}
 }
 
 func main() {
@@ -128,6 +159,12 @@ func main() {
 		log.Fatal(e)
 	}
 
-	var s = Scanner{string(d), 0, 1}
-	fmt.Println(ScannerScanToken(&s))
+	var s = Scanner{d, 0, 1}
+	for {
+		t := ScannerScanToken(&s)
+		fmt.Println(t)
+		if t.t == "eof" {
+			break
+		}
+	}
 }
