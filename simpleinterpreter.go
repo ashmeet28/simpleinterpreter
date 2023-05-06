@@ -56,10 +56,25 @@ func ScannerIsPrintable(v string) bool {
 	return (len(v) == 1) && (v[0] >= 0x20) && (v[0] <= 0x7e)
 }
 
+func ScannerIsAlphabet(v string) bool {
+	return (len(v) == 1) && (((v[0] >= 0x41) && (v[0] <= 0x5a)) || ((v[0] >= 0x61) && (v[0] <= 0x7a)) || (v[0] == 0x5f))
+}
+
+func ScannerIsKeyword(v string) bool {
+	keywords := []string{"if", "else", "for", "func", "nil", "print", "return", "true", "false", "var"}
+	for _, w := range keywords {
+		if v == w {
+			return true
+		}
+	}
+	return false
+}
+
 func ScannerScanToken(s *Scanner) Token {
 	if ScannerIsAtEnd(s) {
 		return Token{"eof", "", (*s).line}
 	}
+	var string_1 string
 	var start int
 	start = (*s).current
 	var c string = ScannerAdvance(s)
@@ -110,7 +125,7 @@ func ScannerScanToken(s *Scanner) Token {
 			return Token{"greater", ">", (*s).line}
 		}
 	case "\x22":
-		for (!(ScannerIsAtEnd(s))) && (ScannerPeek(s) != "\x22") {
+		for (!ScannerIsAtEnd(s)) && (ScannerPeek(s) != "\x22") {
 			if ScannerIsPrintable(ScannerPeek(s)) {
 				ScannerAdvance(s)
 			} else {
@@ -145,9 +160,19 @@ func ScannerScanToken(s *Scanner) Token {
 				}
 			}
 			return Token{"number", string((*s).source[start:(*s).current]), (*s).line}
+		} else if ScannerIsAlphabet(c) {
+			for (!ScannerIsAtEnd(s)) && (ScannerIsAlphabet(ScannerPeek(s)) || ScannerIsDigit(ScannerPeek(s))) {
+				ScannerAdvance(s)
+			}
+			string_1 = string((*s).source[start:(*s).current])
+			if ScannerIsKeyword(string_1) {
+				return Token{string_1, string_1, (*s).line}
+			} else {
+				return Token{"identifier", string_1, (*s).line}
+			}
+		} else {
+			log.Fatalln("Error while tokenization [ Line", (*s).line, "]", "- Unexpected character", c)
 		}
-
-		log.Fatalln("Error while tokenization [ Line", (*s).line, "]", "- Unexpected character", c)
 	}
 
 	return Token{"error", "", (*s).line}
