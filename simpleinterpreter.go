@@ -11,6 +11,7 @@ type Token struct {
 	s string
 	l int
 }
+
 type Scanner struct {
 	source  []byte
 	current int
@@ -61,7 +62,7 @@ func ScannerIsAlphabet(v string) bool {
 }
 
 func ScannerIsKeyword(v string) bool {
-	keywords := []string{"if", "else", "for", "func", "nil", "print", "return", "true", "false", "var"}
+	keywords := []string{"if", "else", "for", "while", "func", "nil", "print", "return", "true", "false", "var"}
 	for _, w := range keywords {
 		if v == w {
 			return true
@@ -74,6 +75,7 @@ func ScannerScanToken(s *Scanner) Token {
 	if ScannerIsAtEnd(s) {
 		return Token{"EOF", "", (*s).line}
 	}
+
 	var string_1 string
 	var start int
 	start = (*s).current
@@ -172,19 +174,24 @@ func ScannerScanToken(s *Scanner) Token {
 	return Token{"ERROR", "Internal error", (*s).line}
 }
 
-func ComplierIsValidSource(source []byte) bool {
-	for i := range source {
-		if !(source[i] == 0xa || ((source[i] >= 0x20) && (source[i] <= 0x7e))) {
+func ScannerIsValidSource(source []byte) bool {
+	for _, b := range source {
+		if !(b == 0xa || ((b >= 0x20) && (b <= 0x7e))) {
 			return false
 		}
 	}
 	return true
 }
 
-func ComplierTokenize(source []byte) []Token {
+func ScannerScan(source []byte) []Token {
+	if !ScannerIsValidSource(source) {
+		log.Fatalln("Error while tokenization - Invalid source")
+	}
+
 	var tokens []Token
 	var s = Scanner{source, 0, 1}
 	var t Token
+
 	for {
 		t = ScannerScanToken(&s)
 		tokens = append(tokens, t)
@@ -194,22 +201,19 @@ func ComplierTokenize(source []byte) []Token {
 			log.Fatalln("Error while tokenization - Line", t.l, "-", t.s)
 		}
 	}
+
 	return tokens
 }
 
-func ComplierCompile(source []byte) {
-	if !ComplierIsValidSource(source) {
-		log.Fatalln("Error - Invalid source")
-	}
-	var tokens []Token = ComplierTokenize(source)
+func ComplierCompile(tokens []Token) {
 	fmt.Println(tokens)
 }
 
 func main() {
-	d, e := os.ReadFile(os.Args[1])
-	if e != nil {
-		log.Fatal(e)
+	data, err := os.ReadFile(os.Args[1])
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	ComplierCompile(d)
+	ComplierCompile(ScannerScan(data))
 }
