@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 )
 
 type Token struct {
@@ -16,6 +17,11 @@ type Scanner struct {
 	source  []byte
 	current int
 	line    int
+}
+
+type Compiler struct {
+	source  []Token
+	current int
 }
 
 func ScannerIsAtEnd(s *Scanner) bool {
@@ -77,8 +83,7 @@ func ScannerScanToken(s *Scanner) Token {
 	}
 
 	var string_1 string
-	var start int
-	start = (*s).current
+	var start int = (*s).current
 	var c string = ScannerAdvance(s)
 
 	switch c {
@@ -205,15 +210,47 @@ func ScannerScan(source []byte) []Token {
 	return tokens
 }
 
-func ComplierCompile(tokens []Token) {
-	fmt.Println(tokens)
+func CompilerAdvance(c *Compiler) {
+	(*c).current = (*c).current + 1
 }
 
+func ComplierExpression(c *Compiler) {
+
+}
+
+func CompilerNumber(c *Compiler) {
+	if s, err := strconv.ParseFloat((*c).source[(*c).current-1].s, 64); err == nil {
+		fmt.Println("OP_PUSH_FLOAT")
+		fmt.Println(s)
+	} else {
+		log.Fatalln("Error while compiling - Line", (*c).source[(*c).current-1].l, "-", "Unable to parse", (*c).source[(*c).current-1].s, "to float.")
+	}
+}
+
+func CompilerGrouping(c *Compiler) {
+	ComplierExpression(c)
+	CompilerConsume(c, "RIGHT_PAREN", "Expect ) after expression.")
+}
+
+func CompilerConsume(c *Compiler, t string, e string) {
+	if (*c).source[(*c).current].t == t {
+		CompilerAdvance(c)
+	} else {
+		log.Fatalln("Error while compiling - Line", (*c).source[(*c).current].l, "-", e)
+	}
+}
+
+func ComplierCompile(tokens []Token) {
+	fmt.Println(tokens)
+	var c Compiler = Compiler{tokens, 0}
+	ComplierExpression(&c)
+	CompilerConsume(&c, "EOF", "Expect end of file.")
+}
 func main() {
-	data, err := os.ReadFile(os.Args[1])
-	if err != nil {
-		log.Fatal(err)
+	d, e := os.ReadFile(os.Args[1])
+	if e != nil {
+		log.Fatal(e)
 	}
 
-	ComplierCompile(ScannerScan(data))
+	ComplierCompile(ScannerScan(d))
 }
