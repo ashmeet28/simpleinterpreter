@@ -24,6 +24,28 @@ type Compiler struct {
 	current int
 }
 
+type ParseRule struct {
+	prefix     func(c *Compiler)
+	infix      func(c *Compiler)
+	precedence int
+}
+
+var ParseRules map[string]ParseRule
+
+var (
+	PREC_NONE       int = 1
+	PREC_ASSIGNMENT int = 2
+	PREC_OR         int = 3
+	PREC_AND        int = 4
+	PREC_EQUALITY   int = 5
+	PREC_COMPARISON int = 6
+	PREC_TERM       int = 7
+	PREC_FACTOR     int = 8
+	PREC_UNARY      int = 9
+	PREC_CALL       int = 10
+	PREC_PRIMARY    int = 11
+)
+
 func ScannerIsAtEnd(s *Scanner) bool {
 	return (*s).current >= len((*s).source)
 }
@@ -181,7 +203,7 @@ func ScannerScanToken(s *Scanner) Token {
 
 func ScannerIsValidSource(source []byte) bool {
 	for _, b := range source {
-		if !(b == 0xa || ((b >= 0x20) && (b <= 0x7e))) {
+		if !((b == 0xa) || ((b >= 0x20) && (b <= 0x7e))) {
 			return false
 		}
 	}
@@ -194,11 +216,14 @@ func ScannerScan(source []byte) []Token {
 	}
 
 	var tokens []Token
-	var s = Scanner{source, 0, 1}
+	var s Scanner = Scanner{source, 0, 1}
 	var t Token
 
 	for {
 		t = ScannerScanToken(&s)
+		if (t.t == "SPACE") || (t.t == "NEW_LINE") {
+			continue
+		}
 		tokens = append(tokens, t)
 		if t.t == "EOF" {
 			break
@@ -214,43 +239,129 @@ func CompilerAdvance(c *Compiler) {
 	(*c).current = (*c).current + 1
 }
 
-func ComplierExpression(c *Compiler) {
+func CompilerPrevious(c *Compiler) Token {
+	return (*c).source[(*c).current-1]
+}
 
+func CompilerCurrent(c *Compiler) Token {
+	return (*c).source[(*c).current]
 }
 
 func CompilerNumber(c *Compiler) {
-	if s, err := strconv.ParseFloat((*c).source[(*c).current-1].s, 64); err == nil {
-		fmt.Println("OP_PUSH_FLOAT")
-		fmt.Println(s)
+	fmt.Println("Comp Number", CompilerPrevious(c), CompilerCurrent(c))
+
+	s, err := strconv.ParseFloat(CompilerPrevious(c).s, 64)
+	if err != nil {
+		log.Fatalln("Error while compiling - Line", CompilerPrevious(c).l, "-", "Unable to parse", CompilerPrevious(c).s, "to float.")
+	}
+	fmt.Println("OP_PUSH_FLOAT")
+	fmt.Println(s)
+}
+
+func CompilerUnary(c *Compiler) {
+	fmt.Println("unary c", CompilerPrevious(c), CompilerCurrent(c))
+
+	var t string = CompilerPrevious(c).t
+
+	CompilerParseExpression(c, PREC_UNARY)
+
+	fmt.Println("unary opert", CompilerPrevious(c), CompilerCurrent(c))
+
+	switch t {
+	case "MINUS":
+		fmt.Println("OP_NEGATE")
+	}
+}
+
+func CompilerBinary(c *Compiler) {
+	fmt.Println("Binary c", CompilerPrevious(c), CompilerCurrent(c))
+	var operatorType string = CompilerPrevious(c).t
+	var rule ParseRule = CompilerGetRule(operatorType)
+	CompilerParseExpression(c, rule.precedence+1)
+
+	fmt.Println("Binary opert", CompilerPrevious(c), CompilerCurrent(c))
+
+	switch operatorType {
+	case "PLUS":
+		fmt.Println("OP_ADD")
+	case "MINUS":
+		fmt.Println("OP_SUBTRACT")
+	case "STAR":
+		fmt.Println("OP_MULTIPLY")
+	case "SLASH":
+		fmt.Println("OP_DIVIDE")
+	}
+}
+
+func CompilerGetRule(t string) ParseRule {
+	return ParseRules[t]
+}
+
+func CompilerConsume(c *Compiler, t string, e string) {
+	if CompilerCurrent(c).t == t {
+		CompilerAdvance(c)
 	} else {
-		log.Fatalln("Error while compiling - Line", (*c).source[(*c).current-1].l, "-", "Unable to parse", (*c).source[(*c).current-1].s, "to float.")
+		log.Fatalln("Error while compiling - Line", CompilerCurrent(c).l, "-", e)
 	}
 }
 
 func CompilerGrouping(c *Compiler) {
-	ComplierExpression(c)
+	fmt.Println("Group ", CompilerPrevious(c), CompilerCurrent(c))
+	CompilerParseExpression(c, PREC_ASSIGNMENT)
 	CompilerConsume(c, "RIGHT_PAREN", "Expect ) after expression.")
 }
 
-func CompilerConsume(c *Compiler, t string, e string) {
-	if (*c).source[(*c).current].t == t {
+func CompilerParseExpression(c *Compiler, precedence int) {
+	CompilerAdvance(c)
+	fmt.Println("ParseE prefix", CompilerPrevious(c), CompilerCurrent(c))
+
+	var prefixRule func(c *Compiler) = CompilerGetRule(CompilerPrevious(c).t).prefix
+
+	if prefixRule == nil {
+		log.Fatalln("Unexpected expression.")
+	}
+
+	prefixRule(c)
+
+	fmt.Println("ParseE infix", CompilerPrevious(c), CompilerCurrent(c))
+	fmt.Println("for loop before", precedence, CompilerGetRule(CompilerCurrent(c).t).precedence)
+
+	for precedence <= CompilerGetRule(CompilerCurrent(c).t).precedence {
+
+		fmt.Println("for loop", precedence, CompilerGetRule(CompilerCurrent(c).t).precedence)
+		fmt.Println("ParseE infix in for", CompilerPrevious(c), CompilerCurrent(c))
 		CompilerAdvance(c)
-	} else {
-		log.Fatalln("Error while compiling - Line", (*c).source[(*c).current].l, "-", e)
+		var infixRule func(c *Compiler) = CompilerGetRule(CompilerPrevious(c).t).infix
+		infixRule(c)
 	}
 }
 
 func ComplierCompile(tokens []Token) {
 	fmt.Println(tokens)
 	var c Compiler = Compiler{tokens, 0}
-	ComplierExpression(&c)
+	CompilerParseExpression(&c, PREC_ASSIGNMENT)
 	CompilerConsume(&c, "EOF", "Expect end of file.")
 }
+
+func CompilerInit() {
+	ParseRules = map[string]ParseRule{
+		"LEFT_PAREN":  {CompilerGrouping, nil, PREC_NONE},
+		"RIGHT_PAREN": {nil, nil, PREC_NONE},
+		"NUMBER":      {CompilerNumber, nil, PREC_NONE},
+		"MINUS":       {CompilerUnary, CompilerBinary, PREC_TERM},
+		"PLUS":        {nil, CompilerBinary, PREC_TERM},
+		"SLASH":       {nil, CompilerBinary, PREC_FACTOR},
+		"STAR":        {nil, CompilerBinary, PREC_FACTOR},
+		"EOF":         {nil, nil, PREC_NONE},
+	}
+}
+
 func main() {
 	d, e := os.ReadFile(os.Args[1])
 	if e != nil {
 		log.Fatal(e)
 	}
 
+	CompilerInit()
 	ComplierCompile(ScannerScan(d))
 }
