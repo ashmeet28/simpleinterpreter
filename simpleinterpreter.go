@@ -248,8 +248,6 @@ func CompilerCurrent(c *Compiler) Token {
 }
 
 func CompilerNumber(c *Compiler) {
-	fmt.Println("Comp Number", CompilerPrevious(c), CompilerCurrent(c))
-
 	s, err := strconv.ParseFloat(CompilerPrevious(c).s, 64)
 	if err != nil {
 		log.Fatalln("Error while compiling - Line", CompilerPrevious(c).l, "-", "Unable to parse", CompilerPrevious(c).s, "to float.")
@@ -259,13 +257,9 @@ func CompilerNumber(c *Compiler) {
 }
 
 func CompilerUnary(c *Compiler) {
-	fmt.Println("unary c", CompilerPrevious(c), CompilerCurrent(c))
-
 	var t string = CompilerPrevious(c).t
 
 	CompilerParseExpression(c, PREC_UNARY)
-
-	fmt.Println("unary opert", CompilerPrevious(c), CompilerCurrent(c))
 
 	switch t {
 	case "MINUS":
@@ -274,12 +268,9 @@ func CompilerUnary(c *Compiler) {
 }
 
 func CompilerBinary(c *Compiler) {
-	fmt.Println("Binary c", CompilerPrevious(c), CompilerCurrent(c))
 	var operatorType string = CompilerPrevious(c).t
 	var rule ParseRule = CompilerGetRule(operatorType)
 	CompilerParseExpression(c, rule.precedence+1)
-
-	fmt.Println("Binary opert", CompilerPrevious(c), CompilerCurrent(c))
 
 	switch operatorType {
 	case "PLUS":
@@ -306,14 +297,12 @@ func CompilerConsume(c *Compiler, t string, e string) {
 }
 
 func CompilerGrouping(c *Compiler) {
-	fmt.Println("Group ", CompilerPrevious(c), CompilerCurrent(c))
 	CompilerParseExpression(c, PREC_ASSIGNMENT)
 	CompilerConsume(c, "RIGHT_PAREN", "Expect ) after expression.")
 }
 
 func CompilerParseExpression(c *Compiler, precedence int) {
 	CompilerAdvance(c)
-	fmt.Println("ParseE prefix", CompilerPrevious(c), CompilerCurrent(c))
 
 	var prefixRule func(c *Compiler) = CompilerGetRule(CompilerPrevious(c).t).prefix
 
@@ -323,13 +312,7 @@ func CompilerParseExpression(c *Compiler, precedence int) {
 
 	prefixRule(c)
 
-	fmt.Println("ParseE infix", CompilerPrevious(c), CompilerCurrent(c))
-	fmt.Println("for loop before", precedence, CompilerGetRule(CompilerCurrent(c).t).precedence)
-
 	for precedence <= CompilerGetRule(CompilerCurrent(c).t).precedence {
-
-		fmt.Println("for loop", precedence, CompilerGetRule(CompilerCurrent(c).t).precedence)
-		fmt.Println("ParseE infix in for", CompilerPrevious(c), CompilerCurrent(c))
 		CompilerAdvance(c)
 		var infixRule func(c *Compiler) = CompilerGetRule(CompilerPrevious(c).t).infix
 		infixRule(c)
