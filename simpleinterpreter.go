@@ -309,7 +309,7 @@ func CompilerCurrent(c *Compiler) Token {
 func CompilerNumber(c *Compiler) {
 	s, err := strconv.ParseFloat(CompilerPrevious(c).s, 64)
 	if err != nil {
-		log.Fatalln("Error while compiling - Line", CompilerPrevious(c).l, "-", "Unable to parse", CompilerPrevious(c).s, "to float.")
+		log.Fatalln("Error while compiling - Line", CompilerPrevious(c).l, "-", "Unable to parse", CompilerPrevious(c).s, "to float")
 	}
 	fmt.Println("OP_PUSH_FLOAT")
 	fmt.Println(s)
@@ -344,7 +344,11 @@ func CompilerBinary(c *Compiler) {
 }
 
 func CompilerGetRule(t int) ParseRule {
-	return ParseRules[t]
+	r, ok := ParseRules[t]
+	if !ok {
+		log.Fatalln("Error - Parse rule for token not found")
+	}
+	return r
 }
 
 func CompilerConsume(c *Compiler, t int, e string) {
@@ -357,7 +361,7 @@ func CompilerConsume(c *Compiler, t int, e string) {
 
 func CompilerGrouping(c *Compiler) {
 	CompilerParseExpression(c, PREC_ASSIGNMENT)
-	CompilerConsume(c, TOKEN_TYPE_RIGHT_PAREN, "Expect ) after expression.")
+	CompilerConsume(c, TOKEN_TYPE_RIGHT_PAREN, "Expect ) after expression")
 }
 
 func CompilerParseExpression(c *Compiler, precedence int) {
@@ -366,7 +370,7 @@ func CompilerParseExpression(c *Compiler, precedence int) {
 	prefixRule := CompilerGetRule(CompilerPrevious(c).t).prefix
 
 	if prefixRule == nil {
-		log.Fatalln("Unexpected expression.")
+		log.Fatalln("Error - Prefix rule not found")
 	}
 
 	prefixRule(c)
@@ -374,6 +378,9 @@ func CompilerParseExpression(c *Compiler, precedence int) {
 	for precedence <= CompilerGetRule(CompilerCurrent(c).t).precedence {
 		CompilerAdvance(c)
 		infixRule := CompilerGetRule(CompilerPrevious(c).t).infix
+		if infixRule == nil {
+			log.Fatalln("Error - Infix rule not found")
+		}
 		infixRule(c)
 	}
 }
@@ -382,7 +389,7 @@ func ComplierCompile(tokens []Token) {
 	fmt.Println(tokens)
 	c := Compiler{tokens, 0}
 	CompilerParseExpression(&c, PREC_ASSIGNMENT)
-	CompilerConsume(&c, TOKEN_TYPE_EOF, "Expect end of file.")
+	CompilerConsume(&c, TOKEN_TYPE_EOF, "Error - Expect end of file")
 }
 
 func CompilerInit() {
