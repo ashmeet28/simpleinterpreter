@@ -8,7 +8,7 @@ import (
 )
 
 type Token struct {
-	t string
+	t int
 	s string
 	l int
 }
@@ -30,20 +30,71 @@ type ParseRule struct {
 	precedence int
 }
 
-var ParseRules map[string]ParseRule
+var ParseRules map[int]ParseRule
 
-var (
-	PREC_NONE       int = 1
-	PREC_ASSIGNMENT int = 2
-	PREC_OR         int = 3
-	PREC_AND        int = 4
-	PREC_EQUALITY   int = 5
-	PREC_COMPARISON int = 6
-	PREC_TERM       int = 7
-	PREC_FACTOR     int = 8
-	PREC_UNARY      int = 9
-	PREC_CALL       int = 10
-	PREC_PRIMARY    int = 11
+const (
+	PREC_ILLEGAL int = iota
+
+	PREC_NONE
+	PREC_ASSIGNMENT
+	PREC_OR
+	PREC_AND
+	PREC_EQUALITY
+	PREC_COMPARISON
+	PREC_TERM
+	PREC_FACTOR
+	PREC_UNARY
+	PREC_CALL
+	PREC_PRIMARY
+)
+
+const (
+	TOKEN_TYPE_ILLEGAL int = iota
+
+	TOKEN_TYPE_LEFT_PAREN
+	TOKEN_TYPE_RIGHT_PAREN
+	TOKEN_TYPE_LEFT_BRACE
+	TOKEN_TYPE_RIGHT_BRACE
+	TOKEN_TYPE_COMMA
+	TOKEN_TYPE_DOT
+	TOKEN_TYPE_MINUS
+	TOKEN_TYPE_PLUS
+	TOKEN_TYPE_SEMICOLON
+	TOKEN_TYPE_SLASH
+	TOKEN_TYPE_STAR
+
+	TOKEN_TYPE_BANG
+	TOKEN_TYPE_BANG_EQUAL
+	TOKEN_TYPE_EQUAL
+	TOKEN_TYPE_EQUAL_EQUAL
+	TOKEN_TYPE_GREATER
+	TOKEN_TYPE_GREATER_EQUAL
+	TOKEN_TYPE_LESS
+	TOKEN_TYPE_LESS_EQUAL
+
+	TOKEN_TYPE_IDENTIFIER
+	TOKEN_TYPE_STRING
+	TOKEN_TYPE_NUMBER
+
+	TOKEN_TYPE_AND
+	TOKEN_TYPE_ELSE
+	TOKEN_TYPE_FALSE
+	TOKEN_TYPE_FOR
+	TOKEN_TYPE_FUNC
+	TOKEN_TYPE_IF
+	TOKEN_TYPE_NIL
+	TOKEN_TYPE_OR
+	TOKEN_TYPE_PRINT
+	TOKEN_TYPE_RETURN
+	TOKEN_TYPE_TRUE
+	TOKEN_TYPE_VAR
+	TOKEN_TYPE_WHILE
+
+	TOKEN_TYPE_SPACE
+	TOKEN_TYPE_NEW_LINE
+
+	TOKEN_TYPE_ERROR
+	TOKEN_TYPE_EOF
 )
 
 func ScannerIsAtEnd(s *Scanner) bool {
@@ -89,90 +140,98 @@ func ScannerIsAlphabet(v string) bool {
 	return (len(v) == 1) && (((v[0] >= 0x41) && (v[0] <= 0x5a)) || ((v[0] >= 0x61) && (v[0] <= 0x7a)) || (v[0] == 0x5f))
 }
 
-func ScannerIsKeyword(v string) bool {
-	keywords := []string{"if", "else", "for", "while", "func", "nil", "print", "return", "true", "false", "var"}
-	for _, w := range keywords {
-		if v == w {
-			return true
-		}
+func ScannerIsTokenKeywordOrIdentifierType(s string) int {
+	keywords := map[string]int{
+		"if":     TOKEN_TYPE_IF,
+		"else":   TOKEN_TYPE_ELSE,
+		"for":    TOKEN_TYPE_FOR,
+		"while":  TOKEN_TYPE_WHILE,
+		"func":   TOKEN_TYPE_FUNC,
+		"nil":    TOKEN_TYPE_NIL,
+		"print":  TOKEN_TYPE_PRINT,
+		"return": TOKEN_TYPE_RETURN,
+		"true":   TOKEN_TYPE_TRUE,
+		"false":  TOKEN_TYPE_FALSE,
+		"var":    TOKEN_TYPE_VAR,
 	}
-	return false
+	elem, ok := keywords[s]
+	if ok {
+		return elem
+	}
+	return TOKEN_TYPE_IDENTIFIER
 }
 
 func ScannerScanToken(s *Scanner) Token {
 	if ScannerIsAtEnd(s) {
-		return Token{"EOF", "", s.line}
+		return Token{TOKEN_TYPE_EOF, "", s.line}
 	}
 
-	var string_1 string
 	start := s.current
 	c := ScannerAdvance(s)
 
 	switch c {
 	case "(":
-		return Token{"LEFT_PAREN", "(", s.line}
+		return Token{TOKEN_TYPE_LEFT_PAREN, "(", s.line}
 	case ")":
-		return Token{"RIGHT_PAREN", ")", s.line}
+		return Token{TOKEN_TYPE_RIGHT_PAREN, ")", s.line}
 	case "{":
-		return Token{"LEFT_BRACE", "{", s.line}
+		return Token{TOKEN_TYPE_LEFT_BRACE, "{", s.line}
 	case "}":
-		return Token{"RIGHT_BRACE", "}", s.line}
+		return Token{TOKEN_TYPE_RIGHT_BRACE, "}", s.line}
 	case ",":
-		return Token{"COMMA", ",", s.line}
+		return Token{TOKEN_TYPE_COMMA, ",", s.line}
 	case ".":
-		return Token{"DOT", ".", s.line}
+		return Token{TOKEN_TYPE_DOT, ".", s.line}
 	case "-":
-		return Token{"MINUS", "-", s.line}
+		return Token{TOKEN_TYPE_MINUS, "-", s.line}
 	case "+":
-		return Token{"PLUS", "+", s.line}
+		return Token{TOKEN_TYPE_PLUS, "+", s.line}
 	case ";":
-		return Token{"SEMICOLON", ";", s.line}
+		return Token{TOKEN_TYPE_SEMICOLON, ";", s.line}
 	case "*":
-		return Token{"STAR", "*", s.line}
+		return Token{TOKEN_TYPE_STAR, "*", s.line}
 	case "!":
 		if ScannerMatch(s, "=") {
-			return Token{"BANG_EQUAL", "!=", s.line}
+			return Token{TOKEN_TYPE_BANG_EQUAL, "!=", s.line}
 		} else {
-			return Token{"BANG", "!", s.line}
+			return Token{TOKEN_TYPE_BANG, "!", s.line}
 		}
 	case "=":
 		if ScannerMatch(s, "=") {
-			return Token{"EQUAL_EQUAL", "==", s.line}
+			return Token{TOKEN_TYPE_EQUAL_EQUAL, "==", s.line}
 		} else {
-			return Token{"EQUAL", "=", s.line}
+			return Token{TOKEN_TYPE_EQUAL, "=", s.line}
 		}
 	case "<":
 		if ScannerMatch(s, "=") {
-			return Token{"LESS_EQUAL", "<=", s.line}
+			return Token{TOKEN_TYPE_LESS_EQUAL, "<=", s.line}
 		} else {
-			return Token{"LESS", "<", s.line}
+			return Token{TOKEN_TYPE_LESS, "<", s.line}
 		}
 	case ">":
 		if ScannerMatch(s, "=") {
-			return Token{"GREATER_EQUAL", ">=", s.line}
+			return Token{TOKEN_TYPE_GREATER_EQUAL, ">=", s.line}
 		} else {
-			return Token{"GREATER", ">", s.line}
+			return Token{TOKEN_TYPE_GREATER, ">", s.line}
 		}
 	case "\x22":
 		for (!ScannerIsAtEnd(s)) && (ScannerPeek(s) != "\x22") {
 			if ScannerIsPrintable(ScannerPeek(s)) {
 				ScannerAdvance(s)
 			} else {
-				return Token{"ERROR", "Unexpected character in string literal", s.line}
+				return Token{TOKEN_TYPE_ERROR, "Unexpected character in string literal", s.line}
 			}
 		}
-
 		if ScannerIsAtEnd(s) {
-			return Token{"ERROR", "Unterminated string", s.line}
+			return Token{TOKEN_TYPE_ERROR, "Unterminated string", s.line}
 		}
-
 		ScannerAdvance(s)
-		return Token{"STRING", string(s.source[start+1 : s.current-1]), s.line}
+		return Token{TOKEN_TYPE_STRING, string(s.source[start+1 : s.current-1]), s.line}
 	case "\x20":
-		return Token{"SPACE", "\x20", s.line}
+		return Token{TOKEN_TYPE_SPACE, "\x20", s.line}
 	case "\x0a":
 		s.line = s.line + 1
-		return Token{"NEW_LINE", "\x0a", s.line}
+		return Token{TOKEN_TYPE_NEW_LINE, "\x0a", s.line}
 	default:
 		if ScannerIsDigit(c) {
 			for ScannerIsDigit(ScannerPeek(s)) {
@@ -184,21 +243,22 @@ func ScannerScanToken(s *Scanner) Token {
 					ScannerAdvance(s)
 				}
 			}
-			return Token{"NUMBER", string(s.source[start:s.current]), s.line}
+			return Token{TOKEN_TYPE_NUMBER, string(s.source[start:s.current]), s.line}
 		} else if ScannerIsAlphabet(c) {
 			for (!ScannerIsAtEnd(s)) && (ScannerIsAlphabet(ScannerPeek(s)) || ScannerIsDigit(ScannerPeek(s))) {
 				ScannerAdvance(s)
 			}
-			string_1 = string(s.source[start:s.current])
-			if ScannerIsKeyword(string_1) {
-				return Token{string_1, string_1, s.line}
+			tempString := string(s.source[start:s.current])
+			t := ScannerIsTokenKeywordOrIdentifierType(tempString)
+			if t == TOKEN_TYPE_IDENTIFIER {
+				return Token{TOKEN_TYPE_IDENTIFIER, tempString, s.line}
 			} else {
-				return Token{"IDENTIFIER", string_1, s.line}
+				return Token{t, tempString, s.line}
 			}
 		}
 	}
 
-	return Token{"ERROR", "Unknown error", s.line}
+	return Token{TOKEN_TYPE_ERROR, "Unknown error", s.line}
 }
 
 func ScannerIsValidSource(source []byte) bool {
@@ -220,13 +280,13 @@ func ScannerScan(source []byte) []Token {
 
 	for {
 		t := ScannerScanToken(&s)
-		if (t.t == "SPACE") || (t.t == "NEW_LINE") {
+		if (t.t == TOKEN_TYPE_SPACE) || (t.t == TOKEN_TYPE_NEW_LINE) {
 			continue
 		}
 		tokens = append(tokens, t)
-		if t.t == "EOF" {
+		if t.t == TOKEN_TYPE_EOF {
 			break
-		} else if t.t == "ERROR" {
+		} else if t.t == TOKEN_TYPE_ERROR {
 			log.Fatalln("Error while tokenization - Line", t.l, "-", t.s)
 		}
 	}
@@ -261,7 +321,7 @@ func CompilerUnary(c *Compiler) {
 	CompilerParseExpression(c, PREC_UNARY)
 
 	switch t {
-	case "MINUS":
+	case TOKEN_TYPE_MINUS:
 		fmt.Println("OP_NEGATE")
 	}
 }
@@ -272,22 +332,22 @@ func CompilerBinary(c *Compiler) {
 	CompilerParseExpression(c, rule.precedence+1)
 
 	switch operatorType {
-	case "PLUS":
+	case TOKEN_TYPE_PLUS:
 		fmt.Println("OP_ADD")
-	case "MINUS":
+	case TOKEN_TYPE_MINUS:
 		fmt.Println("OP_SUBTRACT")
-	case "STAR":
+	case TOKEN_TYPE_STAR:
 		fmt.Println("OP_MULTIPLY")
-	case "SLASH":
+	case TOKEN_TYPE_SLASH:
 		fmt.Println("OP_DIVIDE")
 	}
 }
 
-func CompilerGetRule(t string) ParseRule {
+func CompilerGetRule(t int) ParseRule {
 	return ParseRules[t]
 }
 
-func CompilerConsume(c *Compiler, t string, e string) {
+func CompilerConsume(c *Compiler, t int, e string) {
 	if CompilerCurrent(c).t == t {
 		CompilerAdvance(c)
 	} else {
@@ -297,7 +357,7 @@ func CompilerConsume(c *Compiler, t string, e string) {
 
 func CompilerGrouping(c *Compiler) {
 	CompilerParseExpression(c, PREC_ASSIGNMENT)
-	CompilerConsume(c, "RIGHT_PAREN", "Expect ) after expression.")
+	CompilerConsume(c, TOKEN_TYPE_RIGHT_PAREN, "Expect ) after expression.")
 }
 
 func CompilerParseExpression(c *Compiler, precedence int) {
@@ -322,19 +382,19 @@ func ComplierCompile(tokens []Token) {
 	fmt.Println(tokens)
 	c := Compiler{tokens, 0}
 	CompilerParseExpression(&c, PREC_ASSIGNMENT)
-	CompilerConsume(&c, "EOF", "Expect end of file.")
+	CompilerConsume(&c, TOKEN_TYPE_EOF, "Expect end of file.")
 }
 
 func CompilerInit() {
-	ParseRules = map[string]ParseRule{
-		"LEFT_PAREN":  {CompilerGrouping, nil, PREC_NONE},
-		"RIGHT_PAREN": {nil, nil, PREC_NONE},
-		"NUMBER":      {CompilerNumber, nil, PREC_NONE},
-		"MINUS":       {CompilerUnary, CompilerBinary, PREC_TERM},
-		"PLUS":        {nil, CompilerBinary, PREC_TERM},
-		"SLASH":       {nil, CompilerBinary, PREC_FACTOR},
-		"STAR":        {nil, CompilerBinary, PREC_FACTOR},
-		"EOF":         {nil, nil, PREC_NONE},
+	ParseRules = map[int]ParseRule{
+		TOKEN_TYPE_LEFT_PAREN:  {CompilerGrouping, nil, PREC_NONE},
+		TOKEN_TYPE_RIGHT_PAREN: {nil, nil, PREC_NONE},
+		TOKEN_TYPE_NUMBER:      {CompilerNumber, nil, PREC_NONE},
+		TOKEN_TYPE_MINUS:       {CompilerUnary, CompilerBinary, PREC_TERM},
+		TOKEN_TYPE_PLUS:        {nil, CompilerBinary, PREC_TERM},
+		TOKEN_TYPE_SLASH:       {nil, CompilerBinary, PREC_FACTOR},
+		TOKEN_TYPE_STAR:        {nil, CompilerBinary, PREC_FACTOR},
+		TOKEN_TYPE_EOF:         {nil, nil, PREC_NONE},
 	}
 }
 
