@@ -47,20 +47,20 @@ var (
 )
 
 func ScannerIsAtEnd(s *Scanner) bool {
-	return (*s).current >= len((*s).source)
+	return s.current >= len(s.source)
 }
 
 func ScannerMatch(s *Scanner, expected string) bool {
-	if ScannerIsAtEnd(s) || (string((*s).source[(*s).current:(*s).current+1]) != expected) {
+	if ScannerIsAtEnd(s) || (string(s.source[s.current:s.current+1]) != expected) {
 		return false
 	}
-	(*s).current = (*s).current + 1
+	s.current = s.current + 1
 	return true
 }
 
 func ScannerAdvance(s *Scanner) string {
-	var c string = string((*s).source[(*s).current : (*s).current+1])
-	(*s).current = (*s).current + 1
+	c := string(s.source[s.current : s.current+1])
+	s.current = s.current + 1
 	return c
 }
 
@@ -68,14 +68,14 @@ func ScannerPeek(s *Scanner) string {
 	if ScannerIsAtEnd(s) {
 		return ""
 	}
-	return string((*s).source[(*s).current : (*s).current+1])
+	return string(s.source[s.current : s.current+1])
 }
 
 func ScannerPeekNext(s *Scanner) string {
-	if ((*s).current + 1) >= len((*s).source) {
+	if (s.current + 1) >= len(s.source) {
 		return ""
 	}
-	return string((*s).source[(*s).current+1 : (*s).current+2])
+	return string(s.source[s.current+1 : s.current+2])
 }
 
 func ScannerIsDigit(v string) bool {
@@ -101,78 +101,78 @@ func ScannerIsKeyword(v string) bool {
 
 func ScannerScanToken(s *Scanner) Token {
 	if ScannerIsAtEnd(s) {
-		return Token{"EOF", "", (*s).line}
+		return Token{"EOF", "", s.line}
 	}
 
 	var string_1 string
-	var start int = (*s).current
-	var c string = ScannerAdvance(s)
+	start := s.current
+	c := ScannerAdvance(s)
 
 	switch c {
 	case "(":
-		return Token{"LEFT_PAREN", "(", (*s).line}
+		return Token{"LEFT_PAREN", "(", s.line}
 	case ")":
-		return Token{"RIGHT_PAREN", ")", (*s).line}
+		return Token{"RIGHT_PAREN", ")", s.line}
 	case "{":
-		return Token{"LEFT_BRACE", "{", (*s).line}
+		return Token{"LEFT_BRACE", "{", s.line}
 	case "}":
-		return Token{"RIGHT_BRACE", "}", (*s).line}
+		return Token{"RIGHT_BRACE", "}", s.line}
 	case ",":
-		return Token{"COMMA", ",", (*s).line}
+		return Token{"COMMA", ",", s.line}
 	case ".":
-		return Token{"DOT", ".", (*s).line}
+		return Token{"DOT", ".", s.line}
 	case "-":
-		return Token{"MINUS", "-", (*s).line}
+		return Token{"MINUS", "-", s.line}
 	case "+":
-		return Token{"PLUS", "+", (*s).line}
+		return Token{"PLUS", "+", s.line}
 	case ";":
-		return Token{"SEMICOLON", ";", (*s).line}
+		return Token{"SEMICOLON", ";", s.line}
 	case "*":
-		return Token{"STAR", "*", (*s).line}
+		return Token{"STAR", "*", s.line}
 	case "!":
 		if ScannerMatch(s, "=") {
-			return Token{"BANG_EQUAL", "!=", (*s).line}
+			return Token{"BANG_EQUAL", "!=", s.line}
 		} else {
-			return Token{"BANG", "!", (*s).line}
+			return Token{"BANG", "!", s.line}
 		}
 	case "=":
 		if ScannerMatch(s, "=") {
-			return Token{"EQUAL_EQUAL", "==", (*s).line}
+			return Token{"EQUAL_EQUAL", "==", s.line}
 		} else {
-			return Token{"EQUAL", "=", (*s).line}
+			return Token{"EQUAL", "=", s.line}
 		}
 	case "<":
 		if ScannerMatch(s, "=") {
-			return Token{"LESS_EQUAL", "<=", (*s).line}
+			return Token{"LESS_EQUAL", "<=", s.line}
 		} else {
-			return Token{"LESS", "<", (*s).line}
+			return Token{"LESS", "<", s.line}
 		}
 	case ">":
 		if ScannerMatch(s, "=") {
-			return Token{"GREATER_EQUAL", ">=", (*s).line}
+			return Token{"GREATER_EQUAL", ">=", s.line}
 		} else {
-			return Token{"GREATER", ">", (*s).line}
+			return Token{"GREATER", ">", s.line}
 		}
 	case "\x22":
 		for (!ScannerIsAtEnd(s)) && (ScannerPeek(s) != "\x22") {
 			if ScannerIsPrintable(ScannerPeek(s)) {
 				ScannerAdvance(s)
 			} else {
-				return Token{"ERROR", "Unexpected character in string literal", (*s).line}
+				return Token{"ERROR", "Unexpected character in string literal", s.line}
 			}
 		}
 
 		if ScannerIsAtEnd(s) {
-			return Token{"ERROR", "Unterminated string", (*s).line}
+			return Token{"ERROR", "Unterminated string", s.line}
 		}
 
 		ScannerAdvance(s)
-		return Token{"STRING", string((*s).source[start+1 : (*s).current-1]), (*s).line}
+		return Token{"STRING", string(s.source[start+1 : s.current-1]), s.line}
 	case "\x20":
-		return Token{"SPACE", "\x20", (*s).line}
+		return Token{"SPACE", "\x20", s.line}
 	case "\x0a":
-		(*s).line = (*s).line + 1
-		return Token{"NEW_LINE", "\x0a", (*s).line}
+		s.line = s.line + 1
+		return Token{"NEW_LINE", "\x0a", s.line}
 	default:
 		if ScannerIsDigit(c) {
 			for ScannerIsDigit(ScannerPeek(s)) {
@@ -184,21 +184,21 @@ func ScannerScanToken(s *Scanner) Token {
 					ScannerAdvance(s)
 				}
 			}
-			return Token{"NUMBER", string((*s).source[start:(*s).current]), (*s).line}
+			return Token{"NUMBER", string(s.source[start:s.current]), s.line}
 		} else if ScannerIsAlphabet(c) {
 			for (!ScannerIsAtEnd(s)) && (ScannerIsAlphabet(ScannerPeek(s)) || ScannerIsDigit(ScannerPeek(s))) {
 				ScannerAdvance(s)
 			}
-			string_1 = string((*s).source[start:(*s).current])
+			string_1 = string(s.source[start:s.current])
 			if ScannerIsKeyword(string_1) {
-				return Token{string_1, string_1, (*s).line}
+				return Token{string_1, string_1, s.line}
 			} else {
-				return Token{"IDENTIFIER", string_1, (*s).line}
+				return Token{"IDENTIFIER", string_1, s.line}
 			}
 		}
 	}
 
-	return Token{"ERROR", "Internal error", (*s).line}
+	return Token{"ERROR", "Unknown error", s.line}
 }
 
 func ScannerIsValidSource(source []byte) bool {
@@ -216,11 +216,10 @@ func ScannerScan(source []byte) []Token {
 	}
 
 	var tokens []Token
-	var s Scanner = Scanner{source, 0, 1}
-	var t Token
+	s := Scanner{source, 0, 1}
 
 	for {
-		t = ScannerScanToken(&s)
+		t := ScannerScanToken(&s)
 		if (t.t == "SPACE") || (t.t == "NEW_LINE") {
 			continue
 		}
@@ -236,15 +235,15 @@ func ScannerScan(source []byte) []Token {
 }
 
 func CompilerAdvance(c *Compiler) {
-	(*c).current = (*c).current + 1
+	c.current = c.current + 1
 }
 
 func CompilerPrevious(c *Compiler) Token {
-	return (*c).source[(*c).current-1]
+	return c.source[c.current-1]
 }
 
 func CompilerCurrent(c *Compiler) Token {
-	return (*c).source[(*c).current]
+	return c.source[c.current]
 }
 
 func CompilerNumber(c *Compiler) {
@@ -257,7 +256,7 @@ func CompilerNumber(c *Compiler) {
 }
 
 func CompilerUnary(c *Compiler) {
-	var t string = CompilerPrevious(c).t
+	t := CompilerPrevious(c).t
 
 	CompilerParseExpression(c, PREC_UNARY)
 
@@ -268,8 +267,8 @@ func CompilerUnary(c *Compiler) {
 }
 
 func CompilerBinary(c *Compiler) {
-	var operatorType string = CompilerPrevious(c).t
-	var rule ParseRule = CompilerGetRule(operatorType)
+	operatorType := CompilerPrevious(c).t
+	rule := CompilerGetRule(operatorType)
 	CompilerParseExpression(c, rule.precedence+1)
 
 	switch operatorType {
@@ -304,7 +303,7 @@ func CompilerGrouping(c *Compiler) {
 func CompilerParseExpression(c *Compiler, precedence int) {
 	CompilerAdvance(c)
 
-	var prefixRule func(c *Compiler) = CompilerGetRule(CompilerPrevious(c).t).prefix
+	prefixRule := CompilerGetRule(CompilerPrevious(c).t).prefix
 
 	if prefixRule == nil {
 		log.Fatalln("Unexpected expression.")
@@ -314,14 +313,14 @@ func CompilerParseExpression(c *Compiler, precedence int) {
 
 	for precedence <= CompilerGetRule(CompilerCurrent(c).t).precedence {
 		CompilerAdvance(c)
-		var infixRule func(c *Compiler) = CompilerGetRule(CompilerPrevious(c).t).infix
+		infixRule := CompilerGetRule(CompilerPrevious(c).t).infix
 		infixRule(c)
 	}
 }
 
 func ComplierCompile(tokens []Token) {
 	fmt.Println(tokens)
-	var c Compiler = Compiler{tokens, 0}
+	c := Compiler{tokens, 0}
 	CompilerParseExpression(&c, PREC_ASSIGNMENT)
 	CompilerConsume(&c, "EOF", "Expect end of file.")
 }
