@@ -8,20 +8,20 @@ import (
 )
 
 type Token struct {
-	t int
-	s string
-	l int
+	T int
+	S string
+	L int
 }
 
 type Scanner struct {
-	source  []byte
-	current int
-	line    int
+	Source  []byte
+	Current int
+	Line    int
 }
 
 type Compiler struct {
-	source  []Token
-	current int
+	Source  []Token
+	Current int
 }
 
 const (
@@ -33,8 +33,6 @@ const (
 	PREC_COMP
 	PREC_ADD
 	PREC_MUL
-	PREC_UNARY
-	PREC_CALL
 )
 
 const (
@@ -86,26 +84,27 @@ const (
 	TOKEN_TYPE_EOF
 )
 
-var TokenPrecedence = map[int]int{
-	TOKEN_TYPE_PLUS: PREC_ADD,
-	TOKEN_TYPE_STAR: PREC_MUL,
+var InfixOpPrec = map[int]int{
+	TOKEN_TYPE_PLUS:  PREC_ADD,
+	TOKEN_TYPE_MINUS: PREC_ADD,
+	TOKEN_TYPE_STAR:  PREC_MUL,
 }
 
 func ScannerIsAtEnd(s *Scanner) bool {
-	return s.current >= len(s.source)
+	return s.Current >= len(s.Source)
 }
 
 func ScannerMatch(s *Scanner, expected string) bool {
-	if ScannerIsAtEnd(s) || (string(s.source[s.current:s.current+1]) != expected) {
+	if ScannerIsAtEnd(s) || (string(s.Source[s.Current:s.Current+1]) != expected) {
 		return false
 	}
-	s.current = s.current + 1
+	s.Current = s.Current + 1
 	return true
 }
 
 func ScannerAdvance(s *Scanner) string {
-	c := string(s.source[s.current : s.current+1])
-	s.current = s.current + 1
+	c := string(s.Source[s.Current : s.Current+1])
+	s.Current = s.Current + 1
 	return c
 }
 
@@ -113,14 +112,14 @@ func ScannerPeek(s *Scanner) string {
 	if ScannerIsAtEnd(s) {
 		return ""
 	}
-	return string(s.source[s.current : s.current+1])
+	return string(s.Source[s.Current : s.Current+1])
 }
 
 func ScannerPeekNext(s *Scanner) string {
-	if (s.current + 1) >= len(s.source) {
+	if (s.Current + 1) >= len(s.Source) {
 		return ""
 	}
-	return string(s.source[s.current+1 : s.current+2])
+	return string(s.Source[s.Current+1 : s.Current+2])
 }
 
 func ScannerIsDigit(v string) bool {
@@ -157,75 +156,75 @@ func ScannerIsTokenKeywordOrIdentifierType(s string) int {
 
 func ScannerScanToken(s *Scanner) Token {
 	if ScannerIsAtEnd(s) {
-		return Token{TOKEN_TYPE_EOF, "", s.line}
+		return Token{TOKEN_TYPE_EOF, "", s.Line}
 	}
 
-	start := s.current
+	start := s.Current
 	c := ScannerAdvance(s)
 
 	switch c {
 	case "(":
-		return Token{TOKEN_TYPE_LEFT_PAREN, "(", s.line}
+		return Token{TOKEN_TYPE_LEFT_PAREN, "(", s.Line}
 	case ")":
-		return Token{TOKEN_TYPE_RIGHT_PAREN, ")", s.line}
+		return Token{TOKEN_TYPE_RIGHT_PAREN, ")", s.Line}
 	case "{":
-		return Token{TOKEN_TYPE_LEFT_BRACE, "{", s.line}
+		return Token{TOKEN_TYPE_LEFT_BRACE, "{", s.Line}
 	case "}":
-		return Token{TOKEN_TYPE_RIGHT_BRACE, "}", s.line}
+		return Token{TOKEN_TYPE_RIGHT_BRACE, "}", s.Line}
 	case ",":
-		return Token{TOKEN_TYPE_COMMA, ",", s.line}
+		return Token{TOKEN_TYPE_COMMA, ",", s.Line}
 	case ".":
-		return Token{TOKEN_TYPE_DOT, ".", s.line}
+		return Token{TOKEN_TYPE_DOT, ".", s.Line}
 	case "-":
-		return Token{TOKEN_TYPE_MINUS, "-", s.line}
+		return Token{TOKEN_TYPE_MINUS, "-", s.Line}
 	case "+":
-		return Token{TOKEN_TYPE_PLUS, "+", s.line}
+		return Token{TOKEN_TYPE_PLUS, "+", s.Line}
 	case ";":
-		return Token{TOKEN_TYPE_SEMICOLON, ";", s.line}
+		return Token{TOKEN_TYPE_SEMICOLON, ";", s.Line}
 	case "*":
-		return Token{TOKEN_TYPE_STAR, "*", s.line}
+		return Token{TOKEN_TYPE_STAR, "*", s.Line}
 	case "!":
 		if ScannerMatch(s, "=") {
-			return Token{TOKEN_TYPE_BANG_EQUAL, "!=", s.line}
+			return Token{TOKEN_TYPE_BANG_EQUAL, "!=", s.Line}
 		} else {
-			return Token{TOKEN_TYPE_BANG, "!", s.line}
+			return Token{TOKEN_TYPE_BANG, "!", s.Line}
 		}
 	case "=":
 		if ScannerMatch(s, "=") {
-			return Token{TOKEN_TYPE_EQUAL_EQUAL, "==", s.line}
+			return Token{TOKEN_TYPE_EQUAL_EQUAL, "==", s.Line}
 		} else {
-			return Token{TOKEN_TYPE_EQUAL, "=", s.line}
+			return Token{TOKEN_TYPE_EQUAL, "=", s.Line}
 		}
 	case "<":
 		if ScannerMatch(s, "=") {
-			return Token{TOKEN_TYPE_LESS_EQUAL, "<=", s.line}
+			return Token{TOKEN_TYPE_LESS_EQUAL, "<=", s.Line}
 		} else {
-			return Token{TOKEN_TYPE_LESS, "<", s.line}
+			return Token{TOKEN_TYPE_LESS, "<", s.Line}
 		}
 	case ">":
 		if ScannerMatch(s, "=") {
-			return Token{TOKEN_TYPE_GREATER_EQUAL, ">=", s.line}
+			return Token{TOKEN_TYPE_GREATER_EQUAL, ">=", s.Line}
 		} else {
-			return Token{TOKEN_TYPE_GREATER, ">", s.line}
+			return Token{TOKEN_TYPE_GREATER, ">", s.Line}
 		}
 	case "\x22":
 		for (!ScannerIsAtEnd(s)) && (ScannerPeek(s) != "\x22") {
 			if ScannerIsPrintable(ScannerPeek(s)) {
 				ScannerAdvance(s)
 			} else {
-				return Token{TOKEN_TYPE_ERROR, "Unexpected character in string literal", s.line}
+				return Token{TOKEN_TYPE_ERROR, "Unexpected character in string literal", s.Line}
 			}
 		}
 		if ScannerIsAtEnd(s) {
-			return Token{TOKEN_TYPE_ERROR, "Unterminated string", s.line}
+			return Token{TOKEN_TYPE_ERROR, "Unterminated string", s.Line}
 		}
 		ScannerAdvance(s)
-		return Token{TOKEN_TYPE_STRING, string(s.source[start+1 : s.current-1]), s.line}
+		return Token{TOKEN_TYPE_STRING, string(s.Source[start+1 : s.Current-1]), s.Line}
 	case "\x20":
-		return Token{TOKEN_TYPE_SPACE, "\x20", s.line}
+		return Token{TOKEN_TYPE_SPACE, "\x20", s.Line}
 	case "\x0a":
-		s.line = s.line + 1
-		return Token{TOKEN_TYPE_NEW_LINE, "\x0a", s.line}
+		s.Line = s.Line + 1
+		return Token{TOKEN_TYPE_NEW_LINE, "\x0a", s.Line}
 	default:
 		if ScannerIsDigit(c) {
 			for ScannerIsDigit(ScannerPeek(s)) {
@@ -237,22 +236,22 @@ func ScannerScanToken(s *Scanner) Token {
 					ScannerAdvance(s)
 				}
 			}
-			return Token{TOKEN_TYPE_NUMBER, string(s.source[start:s.current]), s.line}
+			return Token{TOKEN_TYPE_NUMBER, string(s.Source[start:s.Current]), s.Line}
 		} else if ScannerIsAlphabet(c) {
 			for (!ScannerIsAtEnd(s)) && (ScannerIsAlphabet(ScannerPeek(s)) || ScannerIsDigit(ScannerPeek(s))) {
 				ScannerAdvance(s)
 			}
-			tempString := string(s.source[start:s.current])
+			tempString := string(s.Source[start:s.Current])
 			t := ScannerIsTokenKeywordOrIdentifierType(tempString)
 			if t == TOKEN_TYPE_IDENTIFIER {
-				return Token{TOKEN_TYPE_IDENTIFIER, tempString, s.line}
+				return Token{TOKEN_TYPE_IDENTIFIER, tempString, s.Line}
 			} else {
-				return Token{t, tempString, s.line}
+				return Token{t, tempString, s.Line}
 			}
 		}
 	}
 
-	return Token{TOKEN_TYPE_ERROR, "Unknown error", s.line}
+	return Token{TOKEN_TYPE_ERROR, "Unknown error", s.Line}
 }
 
 func ScannerIsValidSource(source []byte) bool {
@@ -274,14 +273,14 @@ func ScannerScan(source []byte) []Token {
 
 	for {
 		t := ScannerScanToken(&s)
-		if (t.t == TOKEN_TYPE_SPACE) || (t.t == TOKEN_TYPE_NEW_LINE) {
+		if (t.T == TOKEN_TYPE_SPACE) || (t.T == TOKEN_TYPE_NEW_LINE) {
 			continue
 		}
 		tokens = append(tokens, t)
-		if t.t == TOKEN_TYPE_EOF {
+		if t.T == TOKEN_TYPE_EOF {
 			break
-		} else if t.t == TOKEN_TYPE_ERROR {
-			log.Fatalln("Error while tokenization - Line", t.l, "-", t.s)
+		} else if t.T == TOKEN_TYPE_ERROR {
+			log.Fatalln("Error while tokenization - Line", t.L, "-", t.S)
 		}
 	}
 
@@ -289,53 +288,86 @@ func ScannerScan(source []byte) []Token {
 }
 
 func CompilerAdvance(c *Compiler) {
-	c.current = c.current + 1
+	c.Current = c.Current + 1
 }
 
 func CompilerCurrent(c *Compiler) Token {
-	return c.source[c.current]
+	return c.Source[c.Current]
 }
 
-func CompilerParseNumber(c *Compiler) {
-	s, err := strconv.ParseFloat(CompilerCurrent(c).s, 64)
+func CompilerParseNumber(c *Compiler) float64 {
+	s, err := strconv.ParseFloat(CompilerCurrent(c).S, 64)
 	if err != nil {
-		log.Fatalln("Error while compiling - Line", CompilerCurrent(c).l, "-", "Unable to parse", CompilerCurrent(c).s, "to float")
+		log.Fatalln("Error while compiling - Line", CompilerCurrent(c).L, "-", "Unable to parse", CompilerCurrent(c).S, "to float")
 	}
-	fmt.Println("OP_PUSH_FLOAT")
-	fmt.Println(s)
+	return s
 }
 
 func CompilerConsume(c *Compiler, t int, e string) {
-	if CompilerCurrent(c).t == t {
+	if CompilerCurrent(c).T == t {
 		CompilerAdvance(c)
 	} else {
-		log.Fatalln("Error while compiling - Line", CompilerCurrent(c).l, "-", e)
+		log.Fatalln("Error while compiling - Line", CompilerCurrent(c).L, "-", e)
 	}
 }
 
+func CompilerIsInfixOp(t Token) bool {
+	_, ok := InfixOpPrec[t.T]
+	return ok
+}
+
 func CompilerParseExpression(c *Compiler) {
-	var OpStack []Token
-	var t Token
+	var opStack []Token
+	var tempToken Token
+	var currentToken Token
+
+	var parsingState int = 1
 
 	for {
-		if CompilerCurrent(c).t == TOKEN_TYPE_NUMBER {
-			fmt.Println("PUSH NUMBER", CompilerCurrent(c).s)
-			CompilerAdvance(c)
-		} else if CompilerCurrent(c).t == TOKEN_TYPE_PLUS || CompilerCurrent(c).t == TOKEN_TYPE_STAR {
-			for (len(OpStack) != 0) && TokenPrecedence[CompilerCurrent(c).t] <= TokenPrecedence[OpStack[len(OpStack)-1].t] {
-				t, OpStack = OpStack[len(OpStack)-1], OpStack[:len(OpStack)-1]
-				fmt.Println(t.s)
+		currentToken = CompilerCurrent(c)
+
+		if parsingState == 1 {
+			if currentToken.T == TOKEN_TYPE_NUMBER {
+				fmt.Println("PUSH NUMBER", currentToken.S)
+				CompilerAdvance(c)
+				parsingState = 3
+			} else if currentToken.T == TOKEN_TYPE_MINUS {
+				opStack = append(opStack, currentToken)
+				CompilerAdvance(c)
+				parsingState = 2
 			}
-			OpStack = append(OpStack, CompilerCurrent(c))
-			CompilerAdvance(c)
-		} else if CompilerCurrent(c).t == TOKEN_TYPE_SEMICOLON {
-			CompilerAdvance(c)
-			break
+		} else if parsingState == 2 {
+			if currentToken.T == TOKEN_TYPE_NUMBER {
+				fmt.Println("PUSH NUMBER", currentToken.S)
+				for (len(opStack) != 0) && (opStack[len(opStack)-1].T == TOKEN_TYPE_MINUS) {
+					tempToken, opStack = opStack[len(opStack)-1], opStack[:len(opStack)-1]
+					fmt.Println("OP_NEGATE")
+				}
+				CompilerAdvance(c)
+				parsingState = 3
+			} else if currentToken.T == TOKEN_TYPE_MINUS {
+				opStack = append(opStack, currentToken)
+				CompilerAdvance(c)
+			}
+		} else if parsingState == 3 {
+			if currentToken.T == TOKEN_TYPE_SEMICOLON {
+				CompilerAdvance(c)
+				break
+			} else if CompilerIsInfixOp(currentToken) {
+				for (len(opStack) != 0) && (InfixOpPrec[currentToken.T] <= InfixOpPrec[opStack[len(opStack)-1].T]) {
+					tempToken, opStack = opStack[len(opStack)-1], opStack[:len(opStack)-1]
+					fmt.Println(tempToken.S)
+				}
+				opStack = append(opStack, currentToken)
+				CompilerAdvance(c)
+				parsingState = 1
+			}
 		}
 	}
-	for len(OpStack) != 0 {
-		t, OpStack = OpStack[len(OpStack)-1], OpStack[:len(OpStack)-1]
-		fmt.Println(t.s)
+
+	for len(opStack) != 0 {
+		tempToken, opStack = opStack[len(opStack)-1], opStack[:len(opStack)-1]
+		fmt.Println(tempToken.S)
 	}
 }
 
@@ -343,7 +375,7 @@ func ComplierCompile(tokens []Token) {
 	fmt.Println(tokens)
 	c := Compiler{tokens, 0}
 	CompilerParseExpression(&c)
-	CompilerConsume(&c, TOKEN_TYPE_EOF, "Error - Expect end of file")
+	CompilerConsume(&c, TOKEN_TYPE_EOF, "Error while compiling- Expect end of file")
 }
 
 func main() {
