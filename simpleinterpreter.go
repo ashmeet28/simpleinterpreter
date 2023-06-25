@@ -24,28 +24,17 @@ type Compiler struct {
 	current int
 }
 
-type ParseRule struct {
-	prefix     func(c *Compiler)
-	infix      func(c *Compiler)
-	precedence int
-}
-
-var ParseRules map[int]ParseRule
-
 const (
 	PREC_ILLEGAL int = iota
 
 	PREC_NONE
-	PREC_ASSIGNMENT
 	PREC_OR
 	PREC_AND
-	PREC_EQUALITY
-	PREC_COMPARISON
-	PREC_TERM
-	PREC_FACTOR
+	PREC_COMP
+	PREC_ADD
+	PREC_MUL
 	PREC_UNARY
 	PREC_CALL
-	PREC_PRIMARY
 )
 
 const (
@@ -96,6 +85,11 @@ const (
 	TOKEN_TYPE_ERROR
 	TOKEN_TYPE_EOF
 )
+
+var TokenPrecedence = map[int]int{
+	TOKEN_TYPE_PLUS: PREC_ADD,
+	TOKEN_TYPE_STAR: PREC_MUL,
+}
 
 func ScannerIsAtEnd(s *Scanner) bool {
 	return s.current >= len(s.source)
@@ -298,57 +292,17 @@ func CompilerAdvance(c *Compiler) {
 	c.current = c.current + 1
 }
 
-func CompilerPrevious(c *Compiler) Token {
-	return c.source[c.current-1]
-}
-
 func CompilerCurrent(c *Compiler) Token {
 	return c.source[c.current]
 }
 
-func CompilerNumber(c *Compiler) {
-	s, err := strconv.ParseFloat(CompilerPrevious(c).s, 64)
+func CompilerParseNumber(c *Compiler) {
+	s, err := strconv.ParseFloat(CompilerCurrent(c).s, 64)
 	if err != nil {
-		log.Fatalln("Error while compiling - Line", CompilerPrevious(c).l, "-", "Unable to parse", CompilerPrevious(c).s, "to float")
+		log.Fatalln("Error while compiling - Line", CompilerCurrent(c).l, "-", "Unable to parse", CompilerCurrent(c).s, "to float")
 	}
 	fmt.Println("OP_PUSH_FLOAT")
 	fmt.Println(s)
-}
-
-func CompilerUnary(c *Compiler) {
-	t := CompilerPrevious(c).t
-
-	CompilerParseExpression(c, PREC_UNARY)
-
-	switch t {
-	case TOKEN_TYPE_MINUS:
-		fmt.Println("OP_NEGATE")
-	}
-}
-
-func CompilerBinary(c *Compiler) {
-	operatorType := CompilerPrevious(c).t
-	rule := CompilerGetRule(operatorType)
-	CompilerParseExpression(c, rule.precedence+1)
-
-	switch operatorType {
-	case TOKEN_TYPE_PLUS:
-		fmt.Println("OP_ADD")
-	case TOKEN_TYPE_MINUS:
-		fmt.Println("OP_SUBTRACT")
-	case TOKEN_TYPE_STAR:
-		fmt.Println("OP_MULTIPLY")
-	case TOKEN_TYPE_SLASH:
-		fmt.Println("OP_DIVIDE")
-	}
-}
-
-func CompilerGetRule(t int) ParseRule {
-	r, ok := ParseRules[t]
-	if !ok {
-		log.Fatalln("Error - Parse rule for token not found")
-	}
-	return r
 }
 
 func CompilerConsume(c *Compiler, t int, e string) {
@@ -359,50 +313,37 @@ func CompilerConsume(c *Compiler, t int, e string) {
 	}
 }
 
-func CompilerGrouping(c *Compiler) {
-	CompilerParseExpression(c, PREC_ASSIGNMENT)
-	CompilerConsume(c, TOKEN_TYPE_RIGHT_PAREN, "Expect ) after expression")
-}
+func CompilerParseExpression(c *Compiler) {
+	var OpStack []Token
+	var t Token
 
-func CompilerParseExpression(c *Compiler, precedence int) {
-	CompilerAdvance(c)
-
-	prefixRule := CompilerGetRule(CompilerPrevious(c).t).prefix
-
-	if prefixRule == nil {
-		log.Fatalln("Error - Prefix rule not found")
-	}
-
-	prefixRule(c)
-
-	for precedence <= CompilerGetRule(CompilerCurrent(c).t).precedence {
-		CompilerAdvance(c)
-		infixRule := CompilerGetRule(CompilerPrevious(c).t).infix
-		if infixRule == nil {
-			log.Fatalln("Error - Infix rule not found")
+	for {
+		if CompilerCurrent(c).t == TOKEN_TYPE_NUMBER {
+			fmt.Println("PUSH NUMBER", CompilerCurrent(c).s)
+			CompilerAdvance(c)
+		} else if CompilerCurrent(c).t == TOKEN_TYPE_PLUS || CompilerCurrent(c).t == TOKEN_TYPE_STAR {
+			for (len(OpStack) != 0) && TokenPrecedence[CompilerCurrent(c).t] <= TokenPrecedence[OpStack[len(OpStack)-1].t] {
+				t, OpStack = OpStack[len(OpStack)-1], OpStack[:len(OpStack)-1]
+				fmt.Println(t.s)
+			}
+			OpStack = append(OpStack, CompilerCurrent(c))
+			CompilerAdvance(c)
+		} else if CompilerCurrent(c).t == TOKEN_TYPE_SEMICOLON {
+			CompilerAdvance(c)
+			break
 		}
-		infixRule(c)
+	}
+	for len(OpStack) != 0 {
+		t, OpStack = OpStack[len(OpStack)-1], OpStack[:len(OpStack)-1]
+		fmt.Println(t.s)
 	}
 }
 
 func ComplierCompile(tokens []Token) {
 	fmt.Println(tokens)
 	c := Compiler{tokens, 0}
-	CompilerParseExpression(&c, PREC_ASSIGNMENT)
+	CompilerParseExpression(&c)
 	CompilerConsume(&c, TOKEN_TYPE_EOF, "Error - Expect end of file")
-}
-
-func CompilerInit() {
-	ParseRules = map[int]ParseRule{
-		TOKEN_TYPE_LEFT_PAREN:  {CompilerGrouping, nil, PREC_NONE},
-		TOKEN_TYPE_RIGHT_PAREN: {nil, nil, PREC_NONE},
-		TOKEN_TYPE_NUMBER:      {CompilerNumber, nil, PREC_NONE},
-		TOKEN_TYPE_MINUS:       {CompilerUnary, CompilerBinary, PREC_TERM},
-		TOKEN_TYPE_PLUS:        {nil, CompilerBinary, PREC_TERM},
-		TOKEN_TYPE_SLASH:       {nil, CompilerBinary, PREC_FACTOR},
-		TOKEN_TYPE_STAR:        {nil, CompilerBinary, PREC_FACTOR},
-		TOKEN_TYPE_EOF:         {nil, nil, PREC_NONE},
-	}
 }
 
 func main() {
@@ -411,6 +352,5 @@ func main() {
 		log.Fatal(e)
 	}
 
-	CompilerInit()
 	ComplierCompile(ScannerScan(d))
 }
