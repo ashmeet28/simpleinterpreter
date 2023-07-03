@@ -7,34 +7,6 @@ import (
 	"strconv"
 )
 
-type Token struct {
-	T int
-	S string
-	L int
-}
-
-type Scanner struct {
-	Source  []byte
-	Current int
-	Line    int
-}
-
-type Compiler struct {
-	Source  []Token
-	Current int
-}
-
-const (
-	PREC_ILLEGAL int = iota
-
-	PREC_NONE
-	PREC_OR
-	PREC_AND
-	PREC_COMP
-	PREC_ADD
-	PREC_MUL
-)
-
 const (
 	TOKEN_TYPE_ILLEGAL int = iota
 
@@ -84,10 +56,16 @@ const (
 	TOKEN_TYPE_EOF
 )
 
-var InfixOpPrec = map[int]int{
-	TOKEN_TYPE_PLUS:  PREC_ADD,
-	TOKEN_TYPE_MINUS: PREC_ADD,
-	TOKEN_TYPE_STAR:  PREC_MUL,
+type Token struct {
+	T int
+	S string
+	L int
+}
+
+type Scanner struct {
+	Source  []byte
+	Current int
+	Line    int
 }
 
 func ScannerIsAtEnd(s *Scanner) bool {
@@ -273,7 +251,7 @@ func ScannerScan(source []byte) []Token {
 
 	for {
 		t := ScannerScanToken(&s)
-		if (t.T == TOKEN_TYPE_SPACE) || (t.T == TOKEN_TYPE_NEW_LINE) {
+		if t.T == TOKEN_TYPE_SPACE {
 			continue
 		}
 		tokens = append(tokens, t)
@@ -287,12 +265,21 @@ func ScannerScan(source []byte) []Token {
 	return tokens
 }
 
+type Compiler struct {
+	Source  []Token
+	Current int
+}
+
 func CompilerAdvance(c *Compiler) {
 	c.Current = c.Current + 1
 }
 
 func CompilerCurrent(c *Compiler) Token {
 	return c.Source[c.Current]
+}
+
+func CompilerPrevious(c *Compiler) Token {
+	return c.Source[c.Current-1]
 }
 
 func CompilerParseNumber(c *Compiler) float64 {
@@ -311,71 +298,28 @@ func CompilerConsume(c *Compiler, t int, e string) {
 	}
 }
 
-func CompilerIsInfixOp(t Token) bool {
-	_, ok := InfixOpPrec[t.T]
-	return ok
-}
+func CompilerVar(c *Compiler) {
 
-func CompilerParseExpression(c *Compiler) {
-	var opStack []Token
-	var tempToken Token
-	var currentToken Token
-
-	var parsingState int = 1
-
-	for {
-		currentToken = CompilerCurrent(c)
-
-		if parsingState == 1 {
-			if currentToken.T == TOKEN_TYPE_NUMBER {
-				fmt.Println("PUSH NUMBER", currentToken.S)
-				CompilerAdvance(c)
-				parsingState = 3
-			} else if currentToken.T == TOKEN_TYPE_MINUS {
-				opStack = append(opStack, currentToken)
-				CompilerAdvance(c)
-				parsingState = 2
-			}
-		} else if parsingState == 2 {
-			if currentToken.T == TOKEN_TYPE_NUMBER {
-				fmt.Println("PUSH NUMBER", currentToken.S)
-				for (len(opStack) != 0) && (opStack[len(opStack)-1].T == TOKEN_TYPE_MINUS) {
-					tempToken, opStack = opStack[len(opStack)-1], opStack[:len(opStack)-1]
-					fmt.Println("OP_NEGATE")
-				}
-				CompilerAdvance(c)
-				parsingState = 3
-			} else if currentToken.T == TOKEN_TYPE_MINUS {
-				opStack = append(opStack, currentToken)
-				CompilerAdvance(c)
-			}
-		} else if parsingState == 3 {
-			if currentToken.T == TOKEN_TYPE_SEMICOLON {
-				CompilerAdvance(c)
-				break
-			} else if CompilerIsInfixOp(currentToken) {
-				for (len(opStack) != 0) && (InfixOpPrec[currentToken.T] <= InfixOpPrec[opStack[len(opStack)-1].T]) {
-					tempToken, opStack = opStack[len(opStack)-1], opStack[:len(opStack)-1]
-					fmt.Println(tempToken.S)
-				}
-				opStack = append(opStack, currentToken)
-				CompilerAdvance(c)
-				parsingState = 1
-			}
-		}
-	}
-
-	for len(opStack) != 0 {
-		tempToken, opStack = opStack[len(opStack)-1], opStack[:len(opStack)-1]
-		fmt.Println(tempToken.S)
-	}
 }
 
 func ComplierCompile(tokens []Token) {
 	fmt.Println(tokens)
 	c := Compiler{tokens, 0}
-	CompilerParseExpression(&c)
-	CompilerConsume(&c, TOKEN_TYPE_EOF, "Error while compiling- Expect end of file")
+	CompilerContinue(&c)
+}
+
+func CompilerContinue(c *Compiler) {
+	t := CompilerCurrent(c)
+	f, ok := CompilerFuncTable[t.T]
+	if !ok {
+		log.Fatalln("Error while compiling - Line", CompilerCurrent(c).L, "-", "Invalid token")
+	}
+	CompilerAdvance(c)
+	f(c)
+}
+
+var CompilerFuncTable = map[int]func(c *Compiler){
+	TOKEN_TYPE_VAR: CompilerVar,
 }
 
 func main() {
